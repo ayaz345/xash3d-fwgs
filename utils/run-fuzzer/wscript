@@ -21,14 +21,14 @@ def add_runner_target(bld, lib, func):
 	libs = [ 'DL' ]
 
 	bld(
-		source   = source,
-		target   = 'run-fuzzer-' + func,
-		features = 'c cprogram',
-		includes = includes,
-		use      = libs,
-		defines  = ['FUNC="Fuzz_' + func + '"', 'LIB="' + lib + '"'],
-		install_path = bld.env.BINDIR,
-		subsystem = bld.env.CONSOLE_SUBSYSTEM
+		source=source,
+		target=f'run-fuzzer-{func}',
+		features='c cprogram',
+		includes=includes,
+		use=libs,
+		defines=[f'FUNC="Fuzz_{func}"', f'LIB="{lib}"'],
+		install_path=bld.env.BINDIR,
+		subsystem=bld.env.CONSOLE_SUBSYSTEM,
 	)
 
 def build(bld):

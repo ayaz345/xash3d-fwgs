@@ -72,14 +72,17 @@ def configure(conf):
 		conf.env.LIB_HAIKU = ['network']
 		conf.env.LIBPATH_HAIKU = ['/boot/system/lib']
 
-	if conf.options.USE_SELECT == None:
+	if conf.options.USE_SELECT is None:
 		conf.options.USE_SELECT = conf.options.DEDICATED
 
 	if conf.options.STATIC:
 		conf.env.STATIC = True
 		conf.define('XASH_NO_LIBDL',1)
 
-	if not conf.env.DEST_OS in ['win32', 'android'] and not conf.options.NO_ASYNC_RESOLVE:
+	if (
+		conf.env.DEST_OS not in ['win32', 'android']
+		and not conf.options.NO_ASYNC_RESOLVE
+	):
 		conf.check_pthreads()
 
 	if hasattr(conf.options, 'DLLEMU'):
