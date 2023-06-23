@@ -48,10 +48,7 @@ class Subproject:
 		if self.utility and not ctx.env.ENABLE_UTILS:
 			return False
 
-		if self.fuzzer and not ctx.env.ENABLE_FUZZER:
-			return False
-
-		return True
+		return bool(not self.fuzzer or ctx.env.ENABLE_FUZZER)
 
 SUBDIRS = [
 	Subproject('public',      dedicated=False, mandatory = True),
@@ -109,7 +106,7 @@ def options(opt):
 	opt.load('compiler_optimizations subproject')
 
 	for i in SUBDIRS:
-		if not i.mandatory and not opt.path.find_node(i.name+'/wscript'):
+		if not i.mandatory and not opt.path.find_node(f'{i.name}/wscript'):
 			i.ignore = True
 			continue
 
@@ -300,16 +297,19 @@ def configure(conf):
 
 	# set _FILE_OFFSET_BITS=64 for filesystems with 64-bit inodes
 	if conf.env.DEST_OS != 'win32' and conf.env.DEST_SIZEOF_VOID_P == 4:
-		file_offset_bits_usable = conf.check_cc(fragment='''#define _FILE_OFFSET_BITS 64
+		if file_offset_bits_usable := conf.check_cc(
+			fragment='''#define _FILE_OFFSET_BITS 64
 		#include <features.h>
 		#ifndef __USE_FILE_OFFSET64
 		#error
 		#endif
 		int main(void){ return 0; }''',
-		msg='Checking if _FILE_OFFSET_BITS can be defined to 64', mandatory=False)
-		if file_offset_bits_usable:
+			msg='Checking if _FILE_OFFSET_BITS can be defined to 64',
+			mandatory=False,
+		):
 			conf.define('_FILE_OFFSET_BITS', 64)
-		else: conf.undefine('_FILE_OFFSET_BITS')
+		else:
+			conf.undefine('_FILE_OFFSET_BITS')
 
 	# check if we can use alloca.h or malloc.h
 	if conf.check_cc(header_name='alloca.h', mandatory=False):
@@ -322,7 +322,7 @@ def configure(conf):
 		conf.env.LIBDIR = conf.env.BINDIR = '${PREFIX}/lib/xash3d'
 		conf.env.SHAREDIR = '${PREFIX}/share/xash3d'
 	else:
-		if sys.platform != 'win32' and not conf.env.DEST_OS == 'android':
+		if sys.platform != 'win32' and conf.env.DEST_OS != 'android':
 			conf.env.PREFIX = '/'
 
 		conf.env.SHAREDIR = conf.env.LIBDIR = conf.env.BINDIR = conf.env.PREFIX

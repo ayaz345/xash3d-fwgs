@@ -52,8 +52,9 @@ class Android:
 			if self.ndk_home != None:
 				break
 		else:
-			ctx.fatal('Set %s environment variable pointing to the root of Android NDK!' %
-				' or '.join(ANDROID_NDK_ENVVARS))
+			ctx.fatal(
+				f"Set {' or '.join(ANDROID_NDK_ENVVARS)} environment variable pointing to the root of Android NDK!"
+			)
 
 		# TODO: this were added at some point of NDK development
 		# but I don't know at which version
@@ -61,7 +62,7 @@ class Android:
 		source_prop = os.path.join(self.ndk_home, 'source.properties')
 		if os.path.exists(source_prop):
 			with open(source_prop) as ndk_props_file:
-				for line in ndk_props_file.readlines():
+				for line in ndk_props_file:
 					tokens = line.split('=')
 					trimed_tokens = [token.strip() for token in tokens]
 
@@ -132,10 +133,7 @@ class Android:
 
 	def ndk_triplet(self, llvm_toolchain = False, toolchain_folder = False):
 		if self.is_x86():
-			if toolchain_folder:
-				return 'x86'
-			else:
-				return 'i686-linux-android'
+			return 'x86' if toolchain_folder else 'i686-linux-android'
 		elif self.is_arm():
 			if llvm_toolchain:
 				return 'armv7a-linux-androideabi'
@@ -144,12 +142,10 @@ class Android:
 		elif self.is_amd64() and toolchain_folder:
 			return 'x86_64'
 		else:
-			return self.arch + '-linux-android'
+			return f'{self.arch}-linux-android'
 
 	def apk_arch(self):
-		if self.is_arm64():
-			return 'arm64-v8a'
-		return self.arch
+		return 'arm64-v8a' if self.is_arm64() else self.arch
 
 	def gen_host_toolchain(self):
 		# With host toolchain we don't care about OS
@@ -168,11 +164,8 @@ class Android:
 		else:
 			self.ctx.fatal('Unsupported by NDK host platform')
 
-		if sys.maxsize > 2**32:
-			arch = 'x86_64'
-		else: arch = 'x86'
-
-		return '%s-%s' % (osname, arch)
+		arch = 'x86_64' if sys.maxsize > 2**32 else 'x86'
+		return f'{osname}-{arch}'
 
 	def gen_gcc_toolchain_path(self):
 		path = 'toolchains'
@@ -181,11 +174,7 @@ class Android:
 		if self.is_clang():
 			toolchain_folder = 'llvm'
 		else:
-			if self.is_host():
-				toolchain = '4.9'
-			else:
-				toolchain = self.toolchain
-
+			toolchain = '4.9' if self.is_host() else self.toolchain
 			toolchain_folder = '%s-%s' % (self.ndk_triplet(toolchain_folder = True), toolchain)
 
 		return os.path.abspath(os.path.join(self.ndk_home, path, toolchain_folder, 'prebuilt', toolchain_host))
@@ -194,7 +183,7 @@ class Android:
 		if self.is_clang():
 			triplet = '%s%d-' % (self.ndk_triplet(llvm_toolchain = True), self.api)
 		else:
-			triplet = self.ndk_triplet() + '-'
+			triplet = f'{self.ndk_triplet()}-'
 		return os.path.join(self.gen_gcc_toolchain_path(), 'bin', triplet)
 
 	def gen_binutils_path(self):
@@ -204,23 +193,17 @@ class Android:
 
 	def cc(self):
 		if self.is_host():
-			s = 'clang'
 			environ = getattr(self.ctx, 'environ', os.environ)
 
-			if 'CC' in environ:
-				s = environ['CC']
-
+			s = environ['CC'] if 'CC' in environ else 'clang'
 			return '%s --target=%s%d' % (s, self.ndk_triplet(), self.api)
 		return self.gen_toolchain_path() + ('clang' if self.is_clang() else 'gcc')
 
 	def cxx(self):
 		if self.is_host():
-			s = 'clang++'
 			environ = getattr(self.ctx, 'environ', os.environ)
 
-			if 'CXX' in environ:
-				s = environ['CXX']
-
+			s = environ['CXX'] if 'CXX' in environ else 'clang++'
 			return '%s --target=%s%d' % (s, self.ndk_triplet(), self.api)
 		return self.gen_toolchain_path() + ('clang++' if self.is_clang() else 'g++')
 
@@ -228,10 +211,7 @@ class Android:
 		if self.is_host():
 			environ = getattr(self.ctx, 'environ', os.environ)
 
-			if 'STRIP' in environ:
-				return environ['STRIP']
-			return 'llvm-strip'
-
+			return environ['STRIP'] if 'STRIP' in environ else 'llvm-strip'
 		if self.ndk_rev >= 23:
 			return os.path.join(self.gen_binutils_path(), 'llvm-strip')
 		return os.path.join(self.gen_binutils_path(), 'strip')
@@ -246,7 +226,7 @@ class Android:
 			arch = 'arm'
 		elif self.is_arm64():
 			arch = 'arm64'
-		path = 'platforms/android-%s/arch-%s' % (self.api, arch)
+		path = f'platforms/android-{self.api}/arch-{arch}'
 
 		return os.path.abspath(os.path.join(self.ndk_home, path))
 
@@ -260,15 +240,15 @@ class Android:
 		cflags = []
 
 		if self.ndk_rev <= ANDROID_NDK_SYSROOT_FLAG_MAX:
-			cflags += ['--sysroot=%s' % (self.sysroot())]
-		else:
-			if self.is_host():
-				cflags += [
-					'--sysroot=%s/sysroot' % (self.gen_gcc_toolchain_path()),
-					'-isystem', '%s/usr/include/' % (self.sysroot())
-				]
+			cflags += [f'--sysroot={self.sysroot()}']
+		elif self.is_host():
+			cflags += [
+				f'--sysroot={self.gen_gcc_toolchain_path()}/sysroot',
+				'-isystem',
+				f'{self.sysroot()}/usr/include/',
+			]
 
-		cflags += ['-I%s' % (self.system_stl())]
+		cflags += [f'-I{self.system_stl()}']
 		if not self.is_clang():
 			cflags += ['-DANDROID', '-D__ANDROID__']
 
@@ -297,7 +277,7 @@ class Android:
 						# I personally don't need complex numbers support, but if you want it
 						# just run sed to patch header
 						for f in ['strtod', 'strtof', 'strtold']:
-							cflags += ['-fno-builtin-%s' % f]
+							cflags += [f'-fno-builtin-{f}']
 				else:
 					cflags += ['-mfloat-abi=softfp']
 			else:
@@ -311,12 +291,12 @@ class Android:
 	def linkflags(self):
 		linkflags = []
 		if self.is_host():
-			linkflags += ['--gcc-toolchain=%s' % self.gen_gcc_toolchain_path()]
+			linkflags += [f'--gcc-toolchain={self.gen_gcc_toolchain_path()}']
 
 		if self.ndk_rev <= ANDROID_NDK_SYSROOT_FLAG_MAX:
-			linkflags += ['--sysroot=%s' % (self.sysroot())]
+			linkflags += [f'--sysroot={self.sysroot()}']
 		elif self.is_host():
-			linkflags += ['--sysroot=%s/sysroot' % (self.gen_gcc_toolchain_path())]
+			linkflags += [f'--sysroot={self.gen_gcc_toolchain_path()}/sysroot']
 
 		if self.is_clang() or self.is_host():
 			linkflags += ['-fuse-ld=lld']
@@ -378,11 +358,8 @@ def configure(conf):
 		conf.env.LDFLAGS += android.ldflags()
 
 		conf.env.HAVE_M = True
-		if android.is_hardfp():
-			conf.env.LIB_M = ['m_hard']
-		else: conf.env.LIB_M = ['m']
-
-		conf.env.PREFIX = '/lib/%s' % android.apk_arch()
+		conf.env.LIB_M = ['m_hard'] if android.is_hardfp() else ['m']
+		conf.env.PREFIX = f'/lib/{android.apk_arch()}'
 
 		conf.msg('Selected Android NDK', '%s, version: %d' % (android.ndk_home, android.ndk_rev))
 		# no need to print C/C++ compiler, as it would be printed by compiler_c/cxx
@@ -397,7 +374,9 @@ def configure(conf):
 		toolchain_path = '/opt/toolchains/motomagx/arm-eabi2/lib/'
 		conf.env.INCLUDES_MAGX = [toolchain_path + i for i in ['ezx-z6/include', 'qt-2.3.8/include']]
 		conf.env.LIBPATH_MAGX  = [toolchain_path + i for i in ['ezx-z6/lib', 'qt-2.3.8/lib']]
-		conf.env.LINKFLAGS_MAGX = ['-Wl,-rpath-link=' + i for i in conf.env.LIBPATH_MAGX]
+		conf.env.LINKFLAGS_MAGX = [
+			f'-Wl,-rpath-link={i}' for i in conf.env.LIBPATH_MAGX
+		]
 
 	conf.env.MAGX = conf.options.MAGX
 	MACRO_TO_DESTOS = OrderedDict({ '__ANDROID__' : 'android' })
